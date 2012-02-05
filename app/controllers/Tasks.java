@@ -13,9 +13,9 @@ public class Tasks extends CRUD {
 
   @After(only={"create", "save"})
   static void execute(String type) {
-    String authorizeUrl = "https://login.salesforce.com/services/oauth2/authorize";
-    String redirectUrl = "http://localhost:9000/tasks/callback";
-    String clientId = "3MVG9yZ.WNe6byQCV4mr8WsWmBGLuWoHBzQouSeZkvuy6OqJ2SvpXG1biHwyrmSDCuVwqcXo_gU9htj8mLCS_";
+    String authorizeUrl = Play.configuration.get("local.sfdc.authorizeUrl").toString();
+    String redirectUrl = Play.configuration.get("local.sfdc.redirectUrl").toString();
+    String clientId = Play.configuration.get("local.sfdc.clientId").toString();
 
     String url = authorizeUrl + "?response_type=code&client_id=" + clientId + "&redirect_uri=" + redirectUrl;
     redirect(url);

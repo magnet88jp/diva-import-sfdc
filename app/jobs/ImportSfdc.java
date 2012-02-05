@@ -1,9 +1,11 @@
 package jobs;
 
+import java.util.*;
+import play.*;
 import play.jobs.*;
-import play.Logger;
 import play.libs.WS;
-import com.google.gson.JsonElement;
+import com.google.gson.*;
+import models.*;
 
 public class ImportSfdc extends Job {
 
@@ -14,19 +16,39 @@ public class ImportSfdc extends Job {
   }
 
   public void doJob() {
-    String tokenUrl = "https://login.salesforce.com/services/oauth2/token";
-    String redirectUrl = "http://localhost:9000/tasks/callback";
-    String clientId = "3MVG9yZ.WNe6byQCV4mr8WsWmBGLuWoHBzQouSeZkvuy6OqJ2SvpXG1biHwyrmSDCuVwqcXo_gU9htj8mLCS_";
-    String clientSecret = "9207928975343564387"; 
+    String tokenUrl = Play.configuration.get("local.sfdc.tokenUrl").toString();
+    String redirectUrl = Play.configuration.get("local.sfdc.redirectUrl").toString();
+    String clientId = Play.configuration.get("local.sfdc.clientId").toString();
+    String clientSecret = Play.configuration.get("local.sfdc.clientSecret").toString();
 
     String url = tokenUrl + "?grant_type=authorization_code&code=" + code + "&client_id=" + clientId + "&client_secret=" + clientSecret + "&redirect_uri=" + redirectUrl;
     JsonElement tokens = WS.url(url).post().getJson(); 
     String accessToken = tokens.getAsJsonObject().get("access_token").getAsString();
     String instanceUrl = tokens.getAsJsonObject().get("instance_url").getAsString();
 
-    url = instanceUrl + "/services/data/v23.0/query/?q=SELECT subject from Case";
+    url = instanceUrl + "/services/data/v23.0/query/?q=SELECT Id, Subject, Description from Case";
     JsonElement cases = WS.url(url).setHeader("Authorization", "OAuth " + accessToken).get().getJson();
-
     Logger.info(cases.toString());
+
+    Iterator<JsonElement> records = cases.getAsJsonObject().get("records").getAsJsonArray().iterator();
+    while(records.hasNext()) {
+      JsonElement attributes = records.next();
+      String caseId = attributes.getAsJsonObject().get("Id").getAsString();
+      String subject = attributes.getAsJsonObject().get("Subject").getAsString();
+      JsonElement elem = attributes.getAsJsonObject().get("Description");
+      String description = elem.isJsonNull() ? "" : elem.getAsString();
+
+      Inquiry inquiry = null;
+      List<Inquiry> inquirys = Inquiry.find("byCode", caseId ).fetch();
+      if(inquirys.size() == 0) {
+        inquiry = new Inquiry(caseId, subject, description, "");
+      } else {
+        inquiry = inquirys.get(0);
+        inquiry.subject = subject;
+        inquiry.question = description;
+      }
+      inquiry._save();
+      
+    }
   }
 }
